@@ -34,7 +34,8 @@ import java.lang.StringBuilder;
  */
 public class CommProto {
     public static void main(String[] args) {
-        initServerConnection();
+        Message message = new Message(Targets.SERVER, Levels.INFO, "Test", "This is a test request");
+        send(message);
     }
     /**
      * Send data to the server or the interface
@@ -42,18 +43,22 @@ public class CommProto {
      * Server protocol will route directly to the server via ethernet
      * @param message The message object sent to the destination
      */
-    public static void send(Message message) throws IOException {
-        Targets target = message.target();
-        DatagramSocket socket = new DatagramSocket();
-        
-        InetAddress address = InetAddress.getByName("192.168.0.0"); //TODO: Change this to the actual IP address
-        int port = 8080; //TODO: Change this to the actual port
-        
-        byte[] data = convToBytes(message);
-        DatagramPacket packet = new DatagramPacket(data, data.length, address, port);
-        
-        socket.send(packet);
-        socket.close();
+    public static void send(Message message) {
+        try {
+            Targets target = message.target();
+            DatagramSocket socket = new DatagramSocket();
+
+            InetAddress address = InetAddress.getByName("127.0.0.1"); //TODO: Change this to the actual IP address
+            int port = 8080; //TODO: Change this to the actual port
+
+            byte[] data = convToBytes(message);
+            DatagramPacket packet = new DatagramPacket(data, data.length, address, port);
+            System.out.println("Request sent to " + address.toString() + ":" + port + " with packet being " + packet);
+            socket.send(packet);
+            socket.close();
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
     }
     
     /**
@@ -75,7 +80,7 @@ public class CommProto {
      * This will be opened on port 8080, no server context
      */
     public static void initServerConnection() {
-        try (ServerSocket serverSocket = new ServerSocket(8080)) {
+        try (ServerSocket serverSocket = new ServerSocket(3000)) {
             System.out.println("Server started on port 8080!");
             while (true) {
                 try (Socket client = serverSocket.accept()) {
@@ -111,7 +116,7 @@ public class CommProto {
             String httpVersion = requestLine[2];
 
             System.out.println("Received data: " + method + " " + target + " " + httpVersion);
-
+            StringBuilder jsonData = null;
             if ("POST".equals(method)) {
                 int contentLength = 0;
                 for (String header : requestsLines) {
@@ -120,15 +125,20 @@ public class CommProto {
                         break;
                     }
                 }
-                StringBuilder jsonData = new StringBuilder();
-                for (int i = 0; i < contentLength; i++) {
-                    jsonData.append((char) br.read());
+                jsonData = new StringBuilder();
+
+                char[] buffer = new char[contentLength];
+                int bytesRead = br.read(buffer, 0, contentLength);
+
+                if (bytesRead != -1) {
+                    jsonData.append(buffer, 0, bytesRead);
                 }
+
                 System.out.println("JSON Data: " + jsonData.toString());
             }
-            
+
         
-            Request requestObject = new Request(method, target, httpVersion);
+            Request requestObject = new Request(method, target, httpVersion, jsonData.toString());
             //parseData(requestObject);
             
             /* TODO:
@@ -136,7 +146,7 @@ public class CommProto {
             * If not send an error response back to the sender
             */
             Response response = new Response("RECEIVED", "The request was successfully received.");
-            String json = "{\"name\":\"" + response.code() + "\",\"body\":" + response.body() + "\"}";
+            String json = "{\"name\":\"" + response.code() + "\",\"body\":\"" + response.body() + "\"}";
             OutputStream clientOutput = client.getOutputStream();
             clientOutput.write(("HTTP/1.1 200 OK\r\n").getBytes());
             clientOutput.write(("Content-Type: application/json\r\n").getBytes());
@@ -150,6 +160,12 @@ public class CommProto {
         }
     }
     
+    private static boolean validateJson(Request request) {
+        String json = request.json();
+        //Requires org.json, but on fleet so can't do that right now, waiting until generating java structure from IntelliJ
+        return false;
+    }
+
     /**
      * Request record to hold the requests send from varius sources
      * @param method Method that the request used to be sent
