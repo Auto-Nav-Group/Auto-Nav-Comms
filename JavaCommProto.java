@@ -32,9 +32,10 @@ import java.lang.StringBuilder;
  * <li>The server will send a 4xx or 5xx code if failed</li>
  * </ul>
  */
-public class CommProto {
+public class JavaCommProto {
     public static void main(String[] args) {
         Message message = new Message(Targets.SERVER, Levels.INFO, "Test", "This is a test request");
+        initServerConnection();
         send(message);
     }
     /**
@@ -49,7 +50,7 @@ public class CommProto {
             DatagramSocket socket = new DatagramSocket();
 
             InetAddress address = InetAddress.getByName("127.0.0.1"); //TODO: Change this to the actual IP address
-            int port = 8080; //TODO: Change this to the actual port
+            int port = 1234; //TODO: Change this to the actual port
 
             byte[] data = convToBytes(message);
             DatagramPacket packet = new DatagramPacket(data, data.length, address, port);
@@ -77,10 +78,10 @@ public class CommProto {
     
     /**
      * Initalizes the server connection to recieve the incoming messages
-     * This will be opened on port 8080, no server context
+     * This will be opened on said port, no server context
      */
     public static void initServerConnection() {
-        try (ServerSocket serverSocket = new ServerSocket(3000)) {
+        try (ServerSocket serverSocket = new ServerSocket(53425)) {
             System.out.println("Server started on port 8080!");
             while (true) {
                 try (Socket client = serverSocket.accept()) {
